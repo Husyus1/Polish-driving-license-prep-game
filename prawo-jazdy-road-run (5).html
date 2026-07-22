@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>ROAD RUN — Polish Driving Theory (Prawo jazdy kat. B)</title>
+<!-- iOS "Add to Home Screen" → opens fullscreen, no Safari bars, like a native app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Road Run">
+<meta name="theme-color" content="#14171A">
+<style>
+  :root{
+    --asphalt:#2C3036;
+    --asphalt-dk:#212429;
+    --asphalt-lt:#3A3F47;
+    --line:#EDEFF2;
+    --yellow:#F5C518;      /* Polish warning-sign yellow */
+    --red:#D8232A;
+    --go:#35C77B;
+    --ink:#14171A;
+    --panel:#181B20;
+    --panel-2:#20242B;
+    --muted:#9AA3AD;
+    --white:#F7F9FA;
+    --display:'Bahnschrift','DIN Alternate','Arial Narrow',system-ui,sans-serif;
+    --body:system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--ink); color:var(--white); font-family:var(--body);
+    overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+  #stage{position:fixed; inset:0; display:flex; flex-direction:column;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+
+  /* hazard stripe — the signature element */
+  .hazard{
+    height:8px; flex:0 0 8px;
+    background:repeating-linear-gradient(135deg,var(--yellow) 0 14px,var(--ink) 14px 28px);
+  }
+
+  #wrap{position:relative; flex:1; overflow:hidden}
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:absolute; top:0; left:0; right:0; padding:10px 14px;
+    display:flex; gap:10px; align-items:center; justify-content:space-between;
+    pointer-events:none; z-index:5;
+  }
+  .chip{
+    font-family:var(--display); letter-spacing:.06em; text-transform:uppercase;
+    background:rgba(24,27,32,.86); border:1px solid rgba(247,249,250,.12);
+    padding:6px 12px; border-radius:4px; font-size:13px; color:var(--white);
+    backdrop-filter:blur(4px);
+  }
+  .chip b{color:var(--yellow); font-weight:700}
+  .chip.alarm{border-color:var(--red); color:#fff; background:rgba(216,35,42,.85)}
+  #hud .right{display:flex; gap:8px; align-items:center}
+  #quitBtn{pointer-events:auto; cursor:pointer}
+
+  /* ---------- Question dock (slides up from the bottom) ---------- */
+  #dock{
+    position:absolute; left:0; right:0; bottom:0; z-index:6;
+    transform:translateY(110%); transition:transform .38s cubic-bezier(.2,.9,.25,1);
+    background:linear-gradient(180deg,rgba(24,27,32,.72),var(--panel) 22%);
+    border-top:3px solid var(--yellow);
+    padding:14px 16px 18px;
+    box-shadow:0 -18px 50px rgba(0,0,0,.55);
+  }
+  #dock.up{transform:translateY(0)}
+  #dock .inner{max-width:900px; margin:0 auto}
+  #meta{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    font-family:var(--display); text-transform:uppercase; letter-spacing:.08em;
+    font-size:11px; color:var(--muted); margin-bottom:8px;
+  }
+  .tag{border:1px solid rgba(247,249,250,.16); padding:3px 8px; border-radius:3px}
+  .tag.pts{border-color:var(--yellow); color:var(--yellow)}
+  .tag.kind{border-color:#5AA9E6; color:#5AA9E6}
+  #qtext{font-size:19px; line-height:1.4; font-weight:500; margin-bottom:12px}
+  #answers{display:grid; gap:8px}
+  #answers.yn{grid-template-columns:1fr 1fr}
+  .ans{
+    display:flex; gap:10px; align-items:flex-start; text-align:left;
+    background:var(--panel-2); border:1px solid rgba(247,249,250,.12); color:var(--white);
+    padding:12px 14px; border-radius:6px; font-size:15px; line-height:1.35;
+    cursor:pointer; font-family:var(--body); transition:border-color .12s, background .12s, transform .06s;
+  }
+  .ans:hover{border-color:var(--yellow); background:#262b33}
+  .ans:active{transform:translateY(1px)}
+  .ans:focus-visible{outline:3px solid var(--yellow); outline-offset:2px}
+  .key{
+    flex:0 0 auto; font-family:var(--display); font-weight:700; font-size:13px;
+    background:#0E1114; border:1px solid rgba(247,249,250,.18); color:var(--yellow);
+    border-radius:3px; padding:2px 7px; letter-spacing:.05em;
+  }
+  .ans.right{border-color:var(--go); background:rgba(53,199,123,.14)}
+  .ans.right .key{color:var(--go); border-color:var(--go)}
+  .ans.wrong{border-color:var(--red); background:rgba(216,35,42,.14)}
+  .ans.wrong .key{color:var(--red); border-color:var(--red)}
+  .ans[disabled]{cursor:default}
+  #answers.yn .ans{justify-content:center; font-family:var(--display); font-size:18px; letter-spacing:.08em; padding:14px}
+
+  #feedback{margin-top:12px; display:none}
+  #feedback.show{display:block}
+  #verdict{font-family:var(--display); text-transform:uppercase; letter-spacing:.09em; font-size:15px; margin-bottom:5px}
+  #verdict.ok{color:var(--go)} #verdict.no{color:var(--red)}
+  #why{font-size:14px; line-height:1.5; color:#CDD4DB; border-left:3px solid var(--yellow); padding-left:10px}
+  #next{
+    margin-top:12px; width:100%; background:var(--yellow); color:var(--ink); border:0;
+    font-family:var(--display); text-transform:uppercase; letter-spacing:.1em; font-weight:700;
+    font-size:15px; padding:12px; border-radius:5px; cursor:pointer;
+  }
+  #next:hover{background:#ffd63d}
+  #next:focus-visible{outline:3px solid var(--white); outline-offset:2px}
+
+  /* timer bar */
+  #tbarWrap{height:5px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; margin-bottom:10px; display:none}
+  #tbarWrap.show{display:block}
+  #tbar{height:100%; width:100%; background:var(--go); transition:width .25s linear}
+  #tbar.warn{background:var(--yellow)} #tbar.crit{background:var(--red)}
+
+  /* ---------- Screens ---------- */
+  .screen{
+    position:absolute; inset:0; z-index:10; display:none;
+    background:radial-gradient(120% 90% at 50% 0%,#232830 0%,#0F1216 70%);
+    overflow-y:auto;
+  }
+  .screen.on{display:flex; align-items:center; justify-content:center}
+  .sheet{width:min(760px,92vw); padding:34px 6px 44px; text-align:center}
+  .kicker{font-family:var(--display); text-transform:uppercase; letter-spacing:.34em; font-size:12px; color:var(--yellow); margin-bottom:10px}
+  h1{
+    font-family:var(--display); font-size:clamp(38px,7vw,68px); line-height:.95;
+    text-transform:uppercase; letter-spacing:.02em; font-weight:700; margin-bottom:6px;
+  }
+  h1 span{color:var(--yellow)}
+  .sub{color:var(--muted); font-size:15px; line-height:1.5; margin:0 auto 26px; max-width:520px}
+  .big{
+    display:inline-block; background:var(--yellow); color:var(--ink); border:0; cursor:pointer;
+    font-family:var(--display); text-transform:uppercase; letter-spacing:.14em; font-weight:700;
+    font-size:20px; padding:16px 54px; border-radius:5px;
+  }
+  .big:hover{background:#ffd63d} .big:focus-visible{outline:3px solid var(--white); outline-offset:3px}
+  .modes{display:grid; gap:12px; margin-top:6px; text-align:left}
+  @media(min-width:680px){.modes{grid-template-columns:repeat(3,1fr)}}
+  .mode{
+    background:var(--panel); border:1px solid rgba(247,249,250,.12); border-top:3px solid var(--yellow);
+    border-radius:6px; padding:18px; cursor:pointer; color:var(--white); font-family:var(--body); text-align:left;
+    transition:transform .12s, border-color .12s;
+  }
+  .mode:hover{transform:translateY(-3px); border-color:var(--yellow)}
+  .mode:focus-visible{outline:3px solid var(--yellow); outline-offset:2px}
+  .mode h3{font-family:var(--display); text-transform:uppercase; letter-spacing:.08em; font-size:20px; margin-bottom:6px}
+  .mode p{font-size:13.5px; color:var(--muted); line-height:1.5}
+  .mode .num{font-family:var(--display); color:var(--yellow); font-size:12px; letter-spacing:.2em; margin-bottom:8px; display:block}
+  .levels{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; text-align:left; margin-top:8px}
+  .lv{
+    background:var(--panel); border:1px solid rgba(247,249,250,.12); border-left:4px solid var(--yellow);
+    border-radius:5px; padding:13px 14px; cursor:pointer; color:var(--white); font-family:var(--body); text-align:left;
+  }
+  .lv:hover{border-color:var(--yellow)}
+  .lv:focus-visible{outline:3px solid var(--yellow); outline-offset:2px}
+  .lv b{display:block; font-family:var(--display); text-transform:uppercase; letter-spacing:.06em; font-size:15px; margin-bottom:3px}
+  .lv small{color:var(--muted); font-size:12px}
+  .lv.done{border-left-color:var(--go)}
+  .lv.done b::after{content:' ✓'; color:var(--go)}
+  .back{
+    margin-top:22px; background:transparent; border:1px solid rgba(247,249,250,.22); color:var(--muted);
+    font-family:var(--display); text-transform:uppercase; letter-spacing:.1em; font-size:12px;
+    padding:9px 20px; border-radius:4px; cursor:pointer;
+  }
+  .back:hover{color:var(--white); border-color:var(--white)}
+  .toggles{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:16px 0 4px}
+  .tg{
+    background:transparent; border:1px solid rgba(247,249,250,.2); color:var(--muted);
+    font-family:var(--display); text-transform:uppercase; letter-spacing:.08em; font-size:11.5px;
+    padding:8px 14px; border-radius:4px; cursor:pointer;
+  }
+  .tg.on{border-color:var(--yellow); color:var(--yellow)}
+  .scorebox{
+    background:var(--panel); border:1px solid rgba(247,249,250,.12); border-radius:8px;
+    padding:22px; margin-bottom:18px;
+  }
+  .scorebig{font-family:var(--display); font-size:64px; line-height:1; letter-spacing:.01em}
+  .scorebig small{font-size:22px; color:var(--muted)}
+  .stamp{
+    display:inline-block; margin-top:12px; font-family:var(--display); text-transform:uppercase;
+    letter-spacing:.2em; font-size:22px; padding:8px 24px; border:3px solid; border-radius:4px; transform:rotate(-2deg);
+  }
+  .stamp.pass{color:var(--go); border-color:var(--go)}
+  .stamp.fail{color:var(--red); border-color:var(--red)}
+  .stats{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:16px; color:var(--muted); font-size:13px}
+  .stats span b{color:var(--white)}
+  .missed{text-align:left; margin-top:18px; max-height:34vh; overflow-y:auto}
+  .missed h4{font-family:var(--display); text-transform:uppercase; letter-spacing:.1em; font-size:12px; color:var(--yellow); margin-bottom:8px}
+  .mrow{background:var(--panel); border-left:3px solid var(--red); padding:10px 12px; border-radius:4px; margin-bottom:7px}
+  .mrow p{font-size:13.5px; line-height:1.45}
+  .mrow p.fix{color:var(--muted); margin-top:4px; font-size:12.5px}
+  .fine{color:#6C7681; font-size:11.5px; line-height:1.6; margin-top:20px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="hazard"></div>
+  <div id="wrap">
+    <canvas id="cv"></canvas>
+
+    <div id="hud">
+      <div class="chip" id="hudLeft">—</div>
+      <div class="right">
+        <div class="chip" id="hudTimer" style="display:none">25:00</div>
+        <div class="chip" id="hudScore">0</div>
+        <button class="chip" id="quitBtn" title="Esc">Menu</button>
+      </div>
+    </div>
+
+    <div id="dock">
+      <div class="inner">
+        <div id="tbarWrap"><div id="tbar"></div></div>
+        <div id="meta"></div>
+        <div id="qtext"></div>
+        <div id="answers"></div>
+        <div id="feedback">
+          <div id="verdict"></div>
+          <div id="why"></div>
+          <button id="next">Continue driving →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MENU -->
+    <div class="screen on" id="scMenu">
+      <div class="sheet">
+        <div class="kicker">Warsaw · WORD · Category B</div>
+        <h1>Road <span>Run</span></h1>
+        <p class="sub">Drive the car. Every hazard on the road becomes a question. Answer it correctly and you roll on — get it wrong and you learn why. Built on the real Polish theory exam format.</p>
+        <button class="big" id="btnStart">Start</button>
+        <p class="fine">Keyboard: <b>Y</b>/<b>N</b> and <b>A</b>/<b>B</b>/<b>C</b> to answer · <b>Enter</b> to continue · <b>Esc</b> for menu</p>
+      </div>
+    </div>
+
+    <!-- MODE SELECT -->
+    <div class="screen" id="scModes">
+      <div class="sheet">
+        <div class="kicker">Choose how you drive today</div>
+        <h1>Three <span>Roads</span></h1>
+        <div class="modes">
+          <button class="mode" id="mLearn">
+            <span class="num">01</span>
+            <h3>Learn</h3>
+            <p>Six levels, from road signs to alcohol limits. No clock. Every answer is explained before you drive on.</p>
+          </button>
+          <button class="mode" id="mPractice">
+            <span class="num">02</span>
+            <h3>Practice</h3>
+            <p>Random traffic situations, endless. Mixed Yes/No and A-B-C. Build a streak, keep your licence points.</p>
+          </button>
+          <button class="mode" id="mExam">
+            <span class="num">03</span>
+            <h3>Exam</h3>
+            <p>The real thing: 32 questions, 20 basic + 12 specialist, 3/2/1 points, 25 minutes. 68 of 74 to pass.</p>
+          </button>
+        </div>
+        <div class="toggles">
+          <button class="tg on" id="tgTimer">Timer: WORD official</button>
+          <button class="tg on" id="tgSound">Sound: on</button>
+        </div>
+        <p class="fine">WORD official = 35 s per Yes/No question, 50 s per A-B-C question, 25:00 on the master clock. Switch it to a flat 30 s per question if you prefer.</p>
+        <button class="back" id="backMenu">← Back</button>
+      </div>
+    </div>
+
+    <!-- LEVEL SELECT -->
+    <div class="screen" id="scLevels">
+      <div class="sheet">
+        <div class="kicker">Mode 01</div>
+        <h1><span>Learn</span></h1>
+        <p class="sub">Work through the levels in order. Each one ends with a debrief.</p>
+        <div class="levels" id="lvList"></div>
+        <button class="back" id="backModes">← Back</button>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="screen" id="scEnd">
+      <div class="sheet">
+        <div class="kicker" id="endKicker">Debrief</div>
+        <div class="scorebox">
+          <div class="scorebig" id="endScore">0<small>/0</small></div>
+          <div id="endStamp"></div>
+          <div class="stats" id="endStats"></div>
+        </div>
+        <div class="missed" id="endMissed"></div>
+        <button class="big" id="endAgain" style="margin-top:18px">Drive again</button>
+        <button class="back" id="endMenu">← Menu</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   ROAD RUN — Polish driving theory (kat. B), single file, no dependencies.
+   Rules encoded from Polish road law (Prawo o ruchu drogowym) and the
+   WORD theory exam format: 32 questions (20 YES/NO + 12 A/B/C),
+   3/2/1 points, max 74, pass at 68, 25 minutes.
+   ========================================================================= */
+
+/* ---------------------------- QUESTION BANK ---------------------------- */
+/* lv: 1 Signs & signals | 2 Right of way | 3 Speed & distance
+      4 Pedestrians & cyclists | 5 Hazards & conditions | 6 Law & equipment
+   type: 'yn' | 'abc'   pts: 3|2|1   stop: correct behaviour is to stop     */
+
+const BANK = [
+/* ---------- LEVEL 1 · SIGNS & SIGNALS ---------- */
+{lv:1,type:'abc',pts:1,scene:{k:'sign',sign:'stop',road:'city'},
+ q:'You are approaching a B-20 "STOP" sign. What must you do?',
+ opts:['Slow down and roll through if the way looks clear','Come to a complete stop before the line, then give way','Stop only if another vehicle is close'],a:1,stop:true,
+ why:'B-20 always means a full stop before the stop line (or before the edge of the intersecting road), and only then giving way. Slowing down is not enough.'},
+
+{lv:1,type:'abc',pts:1,scene:{k:'sign',sign:'yield',road:'rural'},
+ q:'The inverted triangle sign (A-7) at the intersection ahead means:',
+ opts:['Give way to vehicles on the intersecting road','Always stop','You have priority'],a:0,stop:true,
+ why:'A-7 "Ustąp pierwszeństwa" means give way. You do not have to stop if the road is clear, but you must be ready to.'},
+
+{lv:1,type:'abc',pts:1,scene:{k:'sign',sign:'priority',road:'city'},
+ q:'A yellow diamond sign (D-1) at the roadside means:',
+ opts:['You are driving on a priority road','End of priority road','No stopping'],a:0,stop:false,
+ why:'D-1 marks a priority road: vehicles from the intersecting roads must give way to you. The same diamond with a black bar means the priority road ends.'},
+
+{lv:1,type:'abc',pts:1,scene:{k:'sign',sign:'noentry',road:'city'},
+ q:'A solid red circle with a white horizontal bar (B-2) means:',
+ opts:['No entry for all vehicles','No parking','One-way street ahead'],a:0,stop:true,
+ why:'B-2 "Zakaz wjazdu" — no entry. It is typically the wrong-way end of a one-way street.'},
+
+{lv:1,type:'yn',pts:2,scene:{k:'lights',light:'red',road:'city'},
+ q:'The traffic light shows red. The intersection is completely empty. May you drive through?',
+ a:false,stop:true,
+ why:'Red means stop before the stop line, no exceptions for an empty road. Entering on red is one of the fastest ways to lose your licence.'},
+
+{lv:1,type:'abc',pts:3,scene:{k:'lights',light:'amber',road:'city'},
+ q:'The light turns amber while you are approaching the stop line. What does amber mean?',
+ opts:['Speed up and clear the intersection','You may not enter the intersection — unless you are so close you cannot stop safely','Amber has the same meaning as green'],a:1,stop:true,
+ why:'Amber forbids entering the intersection. The only exception is when you are already so close that braking would be dangerous — then you clear the intersection.'},
+
+{lv:1,type:'abc',pts:3,scene:{k:'lights',light:'greenarrow',road:'city',turn:'right'},
+ q:'A green arrow signal allows you to turn right while the main light is red. How do you use it?',
+ opts:['Turn without stopping — the arrow gives you priority','Stop before the line first, then turn giving way to everyone','It only applies to cyclists'],a:1,stop:true,
+ why:'The conditional green arrow requires a full stop before the line first. Then you may turn, but you must give way to all other vehicles and to pedestrians on the crossing.'},
+
+{lv:1,type:'yn',pts:1,scene:{k:'lights',light:'flashgreen',road:'city'},
+ q:'The green light starts flashing. Does it mean the signal is about to change to amber?',
+ a:true,stop:false,
+ why:'Flashing green is a warning that green is ending. Judge your distance — if you cannot cross the line before amber, prepare to stop.'},
+
+/* ---------- LEVEL 2 · RIGHT OF WAY ---------- */
+{lv:2,type:'yn',pts:3,scene:{k:'inter',from:'right',road:'city'},
+ q:'You are entering an unmarked intersection of equal-rank roads. A car is approaching from your right. Must you give way to it?',
+ a:true,stop:true,
+ why:'On equal-rank roads the right-hand rule applies: the vehicle on your right goes first. No signs and no lights means equal rank.'},
+
+{lv:2,type:'yn',pts:3,scene:{k:'inter',from:'left',road:'city'},
+ q:'Same unmarked intersection, but the other car is approaching from your LEFT. Must you give way to it?',
+ a:false,stop:false,
+ why:'You are on his right, so you have priority. Still cover the brake — plenty of drivers get this backwards.'},
+
+{lv:2,type:'abc',pts:3,scene:{k:'leftturn',road:'city',turn:'left'},
+ q:'You are turning left at an intersection. A car is coming from the opposite direction, going straight ahead. What do you do?',
+ opts:['Turn quickly in front of it','Give way and complete the turn once it has passed','Flash your headlights and turn'],a:1,stop:true,
+ why:'A vehicle turning left must give way to oncoming traffic going straight ahead or turning right. Priority does not disappear because you signalled.'},
+
+{lv:2,type:'yn',pts:3,scene:{k:'tram',road:'city'},
+ q:'You are turning left across tram tracks. A tram is coming. Must you give way to the tram?',
+ a:true,stop:true,
+ why:'A tram has priority on equal-rank roads regardless of the direction it comes from, and you never cross in front of one. It cannot swerve and it cannot stop quickly.'},
+
+{lv:2,type:'yn',pts:2,scene:{k:'roundabout',road:'city'},
+ q:'You are leaving a roundabout. Must you signal right before the exit?',
+ a:true,stop:false,
+ why:'Signal right as you pass the exit before yours. On entry you signal only if you turn right immediately; most roundabouts are marked with a give-way sign.'},
+
+{lv:2,type:'yn',pts:3,scene:{k:'bus',road:'city'},
+ q:'Inside a built-up area, a bus signals that it is pulling out from a marked bus stop. Must you give way to it?',
+ a:true,stop:true,
+ why:'In a built-up area you must give way to a bus (or trolleybus) leaving a marked stop. Outside built-up areas that rule does not apply.'},
+
+{lv:2,type:'abc',pts:3,scene:{k:'tramstop',road:'city'},
+ q:'A tram has stopped at a stop that has no boarding island. What must you do?',
+ opts:['Pass it slowly on the right','Stop behind the tram and let the passengers get on and off','Overtake quickly before passengers step out'],a:1,stop:true,
+ why:'With no boarding island the passengers step straight onto the roadway. You stop and only move off once nobody is crossing to or from the tram.'},
+
+{lv:2,type:'yn',pts:2,scene:{k:'merge',road:'motorway'},
+ q:'Your lane is ending because of roadworks. Are drivers in the continuing lane required to let one vehicle in ahead of them (zipper merge)?',
+ a:true,stop:false,
+ why:'Since 2021 the zipper merge is law. Use the ending lane all the way to its end, then merge one by one — alternating.'},
+
+/* ---------- LEVEL 3 · SPEED & DISTANCE ---------- */
+{lv:3,type:'yn',pts:2,scene:{k:'sign',sign:'builtup',road:'city',env:'night'},
+ q:'You are inside a built-up area at 23:00. Is the general speed limit still 50 km/h?',
+ a:true,stop:false,
+ why:'Yes. The old 60 km/h night limit was abolished in 2021 — it is 50 km/h around the clock in built-up areas.'},
+
+{lv:3,type:'abc',pts:2,scene:{k:'plain',road:'rural'},
+ q:'The maximum speed for a car on a single-carriageway road outside a built-up area is:',
+ opts:['80 km/h','90 km/h','100 km/h'],a:1,stop:false,
+ why:'90 km/h on an ordinary two-way road. A dual carriageway with at least two lanes each way allows 100 km/h.'},
+
+{lv:3,type:'abc',pts:2,scene:{k:'plain',road:'motorway'},
+ q:'The maximum speed for a car on a Polish motorway (autostrada) is:',
+ opts:['120 km/h','140 km/h','160 km/h'],a:1,stop:false,
+ why:'140 km/h on a motorway, 120 km/h on a dual-carriageway expressway (droga ekspresowa), 100 km/h if the expressway is single carriageway.'},
+
+{lv:3,type:'abc',pts:2,scene:{k:'sign',sign:'residential',road:'city'},
+ q:'In a residential zone (strefa zamieszkania) the speed limit is:',
+ opts:['20 km/h','30 km/h','50 km/h'],a:0,stop:false,
+ why:'20 km/h, pedestrians may use the whole width of the road and have priority, and parking is only allowed in marked places.'},
+
+{lv:3,type:'abc',pts:3,scene:{k:'follow',road:'motorway'},
+ q:'You are doing 100 km/h on a motorway. The minimum distance to the vehicle in front should be:',
+ opts:['25 metres','50 metres','100 metres'],a:1,stop:false,
+ why:'On motorways and expressways the rule is half your speed in metres: 100 km/h → at least 50 m. It is a fine-able offence, not just advice.'},
+
+{lv:3,type:'yn',pts:2,scene:{k:'follow',road:'rural',tow:true},
+ q:'Outside a built-up area, may a car towing a broken-down vehicle travel at up to 60 km/h?',
+ a:true,stop:false,
+ why:'A towed vehicle: max 30 km/h in a built-up area, 60 km/h outside it. Hazard lights on the towed car, tow rope marked.'},
+
+{lv:3,type:'yn',pts:1,scene:{k:'plain',road:'motorway',env:'night'},
+ q:'Is a vehicle that cannot exceed 40 km/h allowed on a motorway?',
+ a:false,stop:false,
+ why:'Motorways and expressways are closed to vehicles which by construction cannot exceed 40 km/h.'},
+
+/* ---------- LEVEL 4 · PEDESTRIANS & CYCLISTS ---------- */
+{lv:4,type:'yn',pts:3,scene:{k:'crossing',ped:true,road:'city'},
+ q:'A pedestrian is stepping onto the zebra crossing in front of you. Must you give way?',
+ a:true,stop:true,
+ why:'Since June 2021 a pedestrian ENTERING the crossing already has priority, not just one already on it. Approaching any crossing you must slow down and be ready to stop.'},
+
+{lv:4,type:'abc',pts:3,scene:{k:'crossing',ped:true,waiting:true,road:'city'},
+ q:'You are approaching a pedestrian crossing. Someone is standing at the kerb, clearly about to cross. You should:',
+ opts:['Keep your speed — he has not stepped out yet','Slow down, be ready to stop and let him cross','Sound the horn to warn him'],a:1,stop:true,
+ why:'Approaching a crossing requires particular caution and reduced speed. Waiting for eye contact and waving people across is fine — running the crossing is not.'},
+
+{lv:4,type:'yn',pts:3,scene:{k:'crossing',carAhead:true,road:'city'},
+ q:'The car in the lane next to you has stopped just before a pedestrian crossing. May you pass it without stopping?',
+ a:false,stop:true,
+ why:'It has almost certainly stopped for a pedestrian you cannot see. You must stop too — passing a vehicle stopped at a crossing is exactly how pedestrians get killed.'},
+
+{lv:4,type:'yn',pts:3,scene:{k:'crossing',carAhead:true,slow:true,road:'city'},
+ q:'A car ahead of you has slowed down before a pedestrian crossing. Are you allowed to overtake it there?',
+ a:false,stop:true,
+ why:'Overtaking is forbidden on a pedestrian crossing and immediately before it. Same rule at level crossings and, as a rule, at intersections.'},
+
+{lv:4,type:'abc',pts:3,scene:{k:'cyclist',road:'rural'},
+ q:'You are overtaking a cyclist outside a built-up area. The minimum lateral distance you must keep is:',
+ opts:['0.5 metre','1 metre','1.5 metres'],a:1,stop:false,
+ why:'At least 1 metre when overtaking a cyclist, pedestrian, moped or horse. If they might wobble, give more — and never overtake into an oncoming car.'},
+
+{lv:4,type:'yn',pts:3,scene:{k:'children',road:'city'},
+ q:'Children are playing at the roadside next to a school. Should you reduce speed and be ready to brake?',
+ a:true,stop:true,
+ why:'Children and elderly people are legally "particularly vulnerable" road users. Near them, particular caution is mandatory — you are expected to predict the unpredictable.'},
+
+{lv:4,type:'yn',pts:2,scene:{k:'crossing',park:true,road:'city'},
+ q:'May you stop your car 5 metres before a pedestrian crossing to drop off a passenger?',
+ a:false,stop:false,
+ why:'Stopping is forbidden on a crossing and within 10 m before it — and on a two-way, two-lane road, also within 10 m after it. It blocks the view of the pedestrian.'},
+
+{lv:4,type:'abc',pts:1,scene:{k:'cyclist',road:'city',lane:true},
+ q:'A cyclist is riding on a marked cycle crossing across your path. You should:',
+ opts:['Give way to the cyclist','Take priority — cyclists must yield to cars','Sound your horn'],a:0,stop:true,
+ why:'A cyclist on a cycle crossing (przejazd dla rowerzystów) has priority. Turning across one, you give way.'},
+
+/* ---------- LEVEL 5 · HAZARDS & CONDITIONS ---------- */
+{lv:5,type:'yn',pts:3,scene:{k:'emergency',road:'city'},
+ q:'An ambulance with blue lights and siren is coming up behind you. Must you make way for it?',
+ a:true,stop:true,
+ why:'Move to the edge of the road and stop if necessary, so it has a free passage. Do not brake violently in front of it and do not run a red light to escape.'},
+
+{lv:5,type:'abc',pts:3,scene:{k:'jam',road:'motorway'},
+ q:'Traffic on a two-lane expressway comes to a standstill. Where must the emergency corridor be formed?',
+ opts:['On the hard shoulder only','Between the two lanes — left lane moves left, right lane moves right','No corridor is required in Poland'],a:1,stop:false,
+ why:'The korytarz życia is formed between the leftmost lane and the one next to it. On two lanes, that means the gap runs down the middle. Form it before you are asked to.'},
+
+{lv:5,type:'yn',pts:3,scene:{k:'rail',road:'rural'},
+ q:'The red lights at a level crossing are flashing but the barriers are still up and you cannot see a train. May you cross?',
+ a:false,stop:true,
+ why:'Flashing red means stop before the crossing. A train can appear at 100+ km/h and it needs a kilometre to stop. Never gamble on a level crossing.'},
+
+{lv:5,type:'abc',pts:3,scene:{k:'rail',road:'rural',barrier:true},
+ q:'The barrier at the level crossing is starting to come down as you approach. You should:',
+ opts:['Accelerate and cross before it closes','Stop before the crossing and wait','Reverse away quickly'],a:1,stop:true,
+ why:'Once the barrier starts moving, entering the crossing is prohibited. If you were ever trapped between barriers, you drive through them — but do not get trapped.'},
+
+{lv:5,type:'abc',pts:3,scene:{k:'skid',road:'rural',env:'rain'},
+ q:'On a wet road the back of your car starts to slide out. What is the correct reaction?',
+ opts:['Brake hard and hold the wheel straight','Ease off the accelerator and steer gently where you want to go','Pull the handbrake'],a:1,stop:false,
+ why:'Lift off, look and steer where you want to end up, no sudden inputs. Braking hard or yanking the handbrake in a slide turns a wobble into a spin.'},
+
+{lv:5,type:'abc',pts:3,scene:{k:'skid',road:'motorway',env:'rain',aqua:true},
+ q:'Aquaplaning: the steering suddenly goes light in heavy rain. You should:',
+ opts:['Brake immediately and firmly','Release the accelerator, keep the wheel straight, do not brake sharply','Accelerate to push through the water'],a:1,stop:false,
+ why:'The tyres are riding on water — brakes and steering do nothing until they touch tarmac again. Lift off, hold straight, wait for grip to return.'},
+
+{lv:5,type:'yn',pts:3,scene:{k:'plain',road:'rural',env:'fog'},
+ q:'Visibility has dropped below 50 metres in fog. May you switch on the rear fog lamp?',
+ a:true,stop:false,
+ why:'Rear fog lamps are allowed when visibility is under 50 m. Switch them off as soon as it clears — they dazzle the driver behind and look like brake lights.'},
+
+{lv:5,type:'yn',pts:2,scene:{k:'plain',road:'city',env:'night'},
+ q:'In Poland, must dipped-beam headlights be on during the day, in summer, in bright sunshine?',
+ a:true,stop:false,
+ why:'Dipped beams (or daytime running lights at the front) are required 24 hours a day, all year round. It is one of the first things a foreign driver gets fined for.'},
+
+{lv:5,type:'yn',pts:2,scene:{k:'breakdown',road:'motorway'},
+ q:'Your car breaks down on the motorway. Should the warning triangle be placed 100 metres behind it?',
+ a:true,stop:true,
+ why:'Motorway or expressway: 100 m behind, plus hazard lights. Ordinary road outside a built-up area: 30–50 m. Built-up area: right behind the car or on it.'},
+
+{lv:5,type:'yn',pts:2,scene:{k:'follow',road:'motorway',tunnel:true},
+ q:'You are in a tunnel doing 70 km/h. Is a gap of 50 metres to the car in front sufficient?',
+ a:true,stop:false,
+ why:'In a tunnel: at least 50 m below 80 km/h, at least 80 m above 80 km/h. In a jam inside a tunnel, keep at least 5 m and switch off the engine if you stop.'},
+
+/* ---------- LEVEL 6 · LAW, ALCOHOL & EQUIPMENT ---------- */
+{lv:6,type:'yn',pts:3,scene:{k:'police',road:'city',env:'night'},
+ q:'Your blood alcohol level is 0.3‰. Are you legally allowed to drive in Poland?',
+ a:false,stop:true,
+ why:'Poland is strict: from 0.2‰ you are already "after consumption of alcohol" — an offence. Above 0.5‰ it is a crime. One beer can put you over 0.2‰.'},
+
+{lv:6,type:'abc',pts:2,scene:{k:'police',road:'city'},
+ q:'In Poland the state "after consumption of alcohol" (an offence) begins at a blood alcohol level of:',
+ opts:['0.2‰','0.5‰','0.8‰'],a:0,stop:false,
+ why:'0.2–0.5‰ is an offence (wykroczenie). Over 0.5‰ is a criminal offence with a driving ban and a court. There is no "safe one drink" in Poland.'},
+
+{lv:6,type:'yn',pts:3,scene:{k:'plain',road:'city'},
+ q:'May you hold your phone in your hand to read a message while driving in slow traffic?',
+ a:false,stop:false,
+ why:'Holding a phone while driving is prohibited — hands-free only. Slow traffic, a red light, a jam: still driving, still prohibited.'},
+
+{lv:6,type:'yn',pts:2,scene:{k:'plain',road:'city'},
+ q:'Must a passenger sitting in the back seat wear a seat belt?',
+ a:true,stop:false,
+ why:'Everyone in the car wears a belt. The driver is responsible for children; adult passengers are fined themselves — and an unbelted rear passenger can kill the person in front.'},
+
+{lv:6,type:'yn',pts:2,scene:{k:'plain',road:'city'},
+ q:'Must a child shorter than 150 cm generally travel in a child restraint appropriate to its weight and height?',
+ a:true,stop:false,
+ why:'Under 150 cm → child seat or booster, with narrow exceptions. A rear-facing seat may only go in the front if the passenger airbag is deactivated.'},
+
+{lv:6,type:'yn',pts:1,scene:{k:'plain',road:'city'},
+ q:'Must a car in Poland carry a warning triangle and a fire extinguisher?',
+ a:true,stop:false,
+ why:'Both are mandatory equipment. A first-aid kit is recommended but not required for category B, and a reflective vest is not compulsory in Poland (though it is smart to keep one).'},
+
+{lv:6,type:'yn',pts:1,scene:{k:'plain',road:'rural',env:'fog'},
+ q:'Are winter tyres compulsory in Poland between November and March?',
+ a:false,stop:false,
+ why:'Not compulsory — unlike Germany or the Czech Republic. But you are still responsible for driving in a way that matches the conditions, bald summer tyres and ice included.'},
+
+{lv:6,type:'yn',pts:1,scene:{k:'plain',road:'city'},
+ q:'Must every registered vehicle have valid third-party liability insurance (OC)?',
+ a:true,stop:false,
+ why:'OC is compulsory and continuous. A gap of even one day triggers a large penalty from the UFG, and you pay the damage yourself.'},
+
+{lv:6,type:'yn',pts:1,scene:{k:'plain',road:'city'},
+ q:'May you sound the horn inside a built-up area to greet someone you know?',
+ a:false,stop:false,
+ why:'Inside built-up areas the horn is only for averting danger. Using it to hurry someone or say hello is an offence.'},
+
+{lv:6,type:'yn',pts:1,scene:{k:'breakdown',road:'city'},
+ q:'Should you switch on the hazard lights when your car is standing in a place where stopping is forbidden because of a breakdown?',
+ a:true,stop:true,
+ why:'Hazard lights plus the warning triangle. Also use hazards when you brake hard on a fast road to warn the traffic behind you.'},
+
+{lv:6,type:'abc',pts:2,scene:{k:'overtake',road:'rural'},
+ q:'Overtaking is prohibited:',
+ opts:['On a priority road','Immediately before and on a pedestrian crossing','On a roundabout'],a:1,stop:false,
+ why:'Forbidden on and immediately before crossings and level crossings, on intersections (except roundabouts and priority roads), on the crest of a hill and on bends with poor visibility.'},
+
+{lv:6,type:'yn',pts:2,scene:{k:'overtake',road:'motorway',hard:true},
+ q:'Traffic on the motorway is crawling. May you use the hard shoulder to get past?',
+ a:false,stop:false,
+ why:'The emergency lane is for emergency services and broken-down vehicles. Driving on it is a heavy fine — and it blocks the ambulance that may be coming for someone.'},
+
+{lv:6,type:'abc',pts:1,scene:{k:'sign',sign:'mandatory',road:'city'},
+ q:'A blue circle with a white arrow means:',
+ opts:['A prohibited direction','A mandatory direction of travel','A suggested direction'],a:1,stop:false,
+ why:'Blue circles are orders: you must follow them. Red circles are prohibitions. Triangles warn, and in Poland their background is yellow.'},
+
+{lv:6,type:'abc',pts:3,scene:{k:'emergency',road:'city',near:true},
+ q:'A fire engine with siren and blue lights approaches from behind on a narrow street. The best action is:',
+ opts:['Brake hard and stop where you are','Move as far to the right as you safely can, and stop if needed, to leave it a free path','Accelerate to stay ahead of it'],a:1,stop:true,
+ why:'Give it a free passage. Stopping dead in the middle of the lane, or racing ahead, both block it. Move aside first, then stop.'},
+
+{lv:2,type:"yn",pts:3,scene:{k:"inter",road:"rural",from:"right"},
+ q:"At an equal (uncontrolled) crossroads a vehicle reaches it from your right at the same moment. Must you give way to it?",
+ a:true,stop:true,
+ why:"No signs, no lights, equal roads: give way to the right. Whoever is on your right goes first."},
+
+{lv:2,type:"yn",pts:3,scene:{k:"leftturn",road:"city",turn:"left"},
+ q:"You are turning left across the road. An oncoming motorcycle is going straight ahead. Must you give way to it?",
+ a:true,stop:true,
+ why:"Turning across traffic, you yield to everything going straight, cars and motorcycles alike. A bike is narrow and its speed is very easy to misjudge, so wait until you are certain."},
+
+{lv:2,type:"yn",pts:2,scene:{k:"tram",road:"city"},
+ q:"A tram and your car reach an equal intersection at the same time. The tram is turning while you go straight. Does the tram still have priority?",
+ a:true,stop:true,
+ why:"At an intersection of equal roads a tram has priority regardless of its direction, even when it turns across your path. Steel wheels cannot swerve or stop quickly."},
+
+{lv:4,type:"yn",pts:3,scene:{k:"cyclist",road:"city",lane:true,turn:"right"},
+ q:"You are turning right and a cycle path crosses your path. A cyclist on it is going straight ahead. Must you give way to the cyclist?",
+ a:true,stop:true,
+ why:"Turning across a cycle crossing, you yield to cyclists riding straight on it, exactly as you would to pedestrians on a crossing you turn across."},
+
+{lv:4,type:"abc",pts:2,scene:{k:"cyclist",road:"rural"},
+ q:"A cyclist is riding on the road ahead of you outside a built-up area. You may overtake:",
+ opts:["At once, as long as you are quick about it","Only when you can leave at least 1 m of side clearance and the road ahead is clear","Only after sounding the horn to warn the rider"],a:1,stop:false,
+ why:"At least 1 m of lateral gap when passing a cyclist, and only with a clear view ahead. If the lane is too narrow to do that, wait, do not force past."},
+
+{lv:4,type:"yn",pts:2,scene:{k:"overtake",road:"rural"},
+ q:"A motorcyclist ahead is riding in the middle of the lane. Are they entitled to the full width of that lane, so you must overtake properly with space rather than squeeze past inside the same lane?",
+ a:true,stop:false,
+ why:"A motorcycle is a full vehicle and may use the whole lane. Never squeeze past within one lane, change lane or wait for a safe gap and give the rider room."},
+
+{lv:5,type:"abc",pts:3,scene:{k:"animal",road:"rural",env:"day"},
+ q:"On a rural road you pass the wild-animals warning sign at dusk and one deer has just crossed. You should:",
+ opts:["Speed up to clear the danger zone quickly","Ease off, cover the brake and watch both verges, more animals usually follow","Flash your lights and hold the horn down continuously"],a:1,stop:false,
+ why:"Deer move in groups, where one crossed others usually follow. Slow down, watch the verges, be ready to brake. Dusk and dawn are the highest-risk hours."},
+
+{lv:5,type:"yn",pts:3,scene:{k:"animal",road:"rural",env:"night",onRoad:true},
+ q:"A large animal suddenly stands in your lane at night. Is it safer to brake hard in a straight line than to swerve into the oncoming lane?",
+ a:true,stop:true,
+ why:"Swerving into oncoming traffic or the ditch often causes a far worse crash. Brake firmly, keep straight, hold the wheel. Striking the animal may be the lesser danger."},
+
+{lv:5,type:"abc",pts:2,scene:{k:"animal",road:"rural"},
+ q:"You have hit a large wild animal (a boar) that now lies injured on the road. Your first step is to:",
+ opts:["Drag it off the road yourself straight away","Secure the scene, switch on hazards, warn other drivers and call the services","Drive on if the car still moves"],a:1,stop:true,
+ why:"An injured wild animal is dangerous to approach, a wounded boar can badly hurt you. Secure the site, warn traffic and call police or the proper services."},
+
+{lv:5,type:"abc",pts:3,scene:{k:"rail",road:"rural"},
+ q:"You approach an unguarded level crossing (a St Andrew's cross, no barriers, no lights). You must:",
+ opts:["Cross quickly without slowing, since there are no barriers","Approach at reduced speed, be ready to stop, look and listen, and give way to any train","Stop fully every single time, even with no train in sight"],a:1,stop:true,
+ why:"With no barriers YOU are the safety system. Slow down, look and listen, be ready to stop. A train always has priority and cannot brake for you."},
+
+{lv:5,type:"yn",pts:2,scene:{k:"follow",road:"city"},
+ q:"Before changing lane in city traffic, is a glance in the mirrors enough on its own, without a look over your shoulder?",
+ a:false,stop:false,
+ why:"Mirrors leave blind spots where a motorcycle or cyclist can hide. Always add a quick shoulder check before you move across."}
+];
+
+/* ---------------------------- ENGINE ---------------------------- */
+const LEVELS = [
+  {n:1,name:'Signs & signals',   d:'Stop, yield, priority, lights'},
+  {n:2,name:'Right of way',      d:'Intersections, trams, buses'},
+  {n:3,name:'Speed & distance',  d:'Limits and safe gaps'},
+  {n:4,name:'Pedestrians & bikes',d:'Crossings and vulnerable users'},
+  {n:5,name:'Hazards',           d:'Rain, fog, rail, emergencies'},
+  {n:6,name:'Law & equipment',   d:'Alcohol, belts, kit, fines'}
+];
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const el = id => document.getElementById(id);
+const dock = el('dock'), answersEl = el('answers'), qtext = el('qtext'), metaEl = el('meta');
+const fb = el('feedback'), verdict = el('verdict'), whyEl = el('why'), nextBtn = el('next');
+const hudLeft = el('hudLeft'), hudScore = el('hudScore'), hudTimer = el('hudTimer');
+const tbarWrap = el('tbarWrap'), tbar = el('tbar');
+
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+
+/* ---- settings ---- */
+let useWordTimer = true, soundOn = true;
+const learnDone = new Set();
+
+/* ---- audio ---- */
+let ac=null;
+function beep(freq,dur,type){
+  if(!soundOn) return;
+  try{
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(.0001,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(.16,ac.currentTime+.01);
+    g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+dur);
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+dur+.02);
+  }catch(e){}
+}
+const sGood=()=>{beep(700,.09);setTimeout(()=>beep(1050,.13),90);};
+const sBad =()=>{beep(150,.25,'sawtooth');};
+const sTick=()=>beep(1200,.03,'square');
+
+/* ---- game state ---- */
+const G = {
+  mode:null, queue:[], idx:0, q:null,
+  phase:'idle',            // idle | drive | ask | resolve
+  scroll:0, speed:0, cruise:5.4, sceneDist:520,
+  shake:0, flash:0, flashCol:'#D8232A',
+  pedT:0, blink:0,
+  points:0, maxPoints:0, correct:0, wrong:0, streak:0, best:0,
+  missed:[], answered:false,
+  qTime:0, qLimit:0, examEnd:0, level:null, lastAnswerRight:false
+};
+
+/* ---------------------------- DRAWING ---------------------------- */
+const C = {
+  asphalt:'#2B2F35', line:'#E9ECEF', sidewalk:'#5B616B', kerb:'#7D848E',
+  grass:'#3E5A34', grass2:'#476A3B', tree:'#2E4A28', tree2:'#37582F', trunk:'#4A3320',
+  bldgs:['#3A3F47','#41474F','#343941','#4A4139','#454B54','#3D424A'], barrier:'#B8BEC6'
+};
+let CARY;
+function geo(road){
+  const isMw = road==='motorway';
+  const w = Math.min(W*(isMw?0.54:0.40), isMw?400:260);
+  const x = (W-w)/2;
+  return {x, w, cx:x+w/2, right:x+w, isMw, our:x+w*0.72, off:x+w*0.28};
+}
+const SCENE_GAP = 104;    // where the car stops relative to the hazard
+const SPAWN_AHEAD = 560;  // how far ahead the next hazard first appears
+function smooth(t){ t=Math.min(1,Math.max(0,t)); return t*t*(3-2*t); }
+function sceneY(){ return CARY - (G.hazPos - G.odo); }              // hazard scrolls with the odometer, off the bottom when passed
+function approachT(){ const a=(G.hazPos-SCENE_GAP)-G.spawnOdo; return a<=0?1:Math.min(1,Math.max(0,(G.odo-G.spawnOdo)/a)); }
+
+function drawWorld(){
+  const sc = (G.q && G.q.scene) || {k:'plain',road:'city'};
+  const road = sc.road||'city', env = sc.env||'day';
+  const g = geo(road);
+  CARY = H*0.72; G.carX = g.our; G.carY = CARY;
+
+  drawSurroundings(g, road);
+  drawRoad(g);
+  drawSceneObjects(sc, g, road);
+  drawCar(g.our);
+
+  if(env==='night'){ ctx.fillStyle='rgba(5,8,18,.66)'; ctx.fillRect(0,0,W,H); drawBeams(g.our); }
+  else if(env==='fog'){ ctx.fillStyle='rgba(205,210,214,.40)'; ctx.fillRect(0,0,W,H);
+    const gr=ctx.createLinearGradient(0,0,0,H); gr.addColorStop(0,'rgba(222,226,230,.9)'); gr.addColorStop(.55,'rgba(222,226,230,0)');
+    ctx.fillStyle=gr; ctx.fillRect(0,0,W,H); }
+  else if(env==='rain'){ ctx.fillStyle='rgba(28,42,58,.30)'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(220,235,255,.32)'; ctx.lineWidth=1.4;
+    for(let i=0;i<90;i++){ const x=(i*137)%W, y=((i*211+G.odo*14)%(H+40))-20;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-3,y+14); ctx.stroke(); } }
+  if(G.flash>0){ ctx.fillStyle=G.flashCol; ctx.globalAlpha=Math.min(.42,G.flash); ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+}
+
+/* ---- environment ---- */
+function drawSurroundings(g, road){
+  if(road==='city'){
+    ctx.fillStyle='#2C2F35'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=C.sidewalk; ctx.fillRect(g.x-40,0,40,H); ctx.fillRect(g.right,0,40,H);
+    ctx.fillStyle=C.kerb; ctx.fillRect(g.x-4,0,4,H); ctx.fillRect(g.right,0,4,H);
+    const period=176, off=(G.odo*0.5)%period;
+    for(let i=-1;i<Math.ceil(H/period)+2;i++){
+      const yy=i*period-off;
+      ctx.fillStyle=C.bldgs[((i%C.bldgs.length)+C.bldgs.length)%C.bldgs.length];
+      ctx.fillRect(g.x-40-98, yy, 94, period-16); drawWindows(g.x-40-98, yy, 94, period-16);
+      ctx.fillStyle=C.bldgs[((i*2+3)%C.bldgs.length+C.bldgs.length)%C.bldgs.length];
+      ctx.fillRect(g.right+44, yy+44, 94, period-16); drawWindows(g.right+44, yy+44, 94, period-16);
+    }
+  } else if(road==='motorway'){
+    ctx.fillStyle=C.grass; ctx.fillRect(0,0,W,H); grassTexture();
+    median(g.x); railing(g.right+12);
+  } else {
+    ctx.fillStyle=C.grass; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=C.grass2; for(let i=-1;i<8;i++){ const yy=((i*150+G.odo*0.4)%(H+160))-160; ctx.fillRect(0,yy,W,72); }
+    grassTexture(); trees(g);
+  }
+}
+function drawWindows(bx,by,bw,bh){
+  ctx.fillStyle='rgba(245,222,130,.14)';
+  for(let yy=by+12; yy<by+bh-8; yy+=22)
+    for(let xx=bx+9; xx<bx+bw-11; xx+=21)
+      if(((xx*7+yy)|0)%3) ctx.fillRect(xx,yy,10,12);
+}
+function grassTexture(){
+  ctx.fillStyle='rgba(0,0,0,.10)';
+  for(let i=0;i<46;i++){ const yy=((i*89+G.odo*0.6)%(H+60))-30, xx=(i*151)%W; ctx.fillRect(xx,yy,20,7); }
+}
+function median(x){ ctx.fillStyle='#8A9099'; ctx.fillRect(x-16,0,16,H); ctx.fillStyle=C.barrier; ctx.fillRect(x-5,0,5,H); }
+function railing(x){ ctx.strokeStyle=C.barrier; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  ctx.fillStyle='#8A9099'; for(let y=-10;y<H;y+=44) ctx.fillRect(x-2,((y+G.odo)%(H+44))-22,4,10); }
+function trees(g){
+  const xs=[g.x-64,g.x-118,g.right+58,g.right+112];
+  xs.forEach((tx,i)=>{ const yy=((i*180+G.odo*0.7)%(H+220))-110;
+    ctx.fillStyle=C.trunk; ctx.fillRect(tx-3,yy+18,6,16);
+    ctx.fillStyle=C.tree; ctx.beginPath(); ctx.arc(tx,yy+10,16,0,7); ctx.fill();
+    ctx.fillStyle=C.tree2; ctx.beginPath(); ctx.arc(tx-6,yy+6,10,0,7); ctx.fill(); });
+}
+function drawRoad(g){
+  ctx.fillStyle=C.asphalt; ctx.fillRect(g.x,0,g.w,H);
+  ctx.fillStyle='rgba(255,255,255,.02)'; ctx.fillRect(g.x,0,g.w*0.5,H);
+  ctx.fillStyle=C.line; ctx.fillRect(g.x+4,0,3,H); ctx.fillRect(g.right-7,0,3,H);
+  const dash=42,gap=30,off=G.odo%(dash+gap);
+  ctx.fillStyle=C.line; for(let y=-dash;y<H+dash;y+=dash+gap) ctx.fillRect(g.cx-2,y+off,4,dash);
+}
+
+/* ---- vehicles & actors ---- */
+function drawVehicle(x,y,o){
+  o=o||{}; const long=o.long, L=long?150:66, Wd=long?50:48;
+  ctx.save(); ctx.translate(x,y); if(o.rot) ctx.rotate(o.rot*Math.PI/180);
+  ctx.fillStyle='rgba(0,0,0,.30)'; ctx.fillRect(-Wd/2+2,-L/2+3,Wd,L);
+  ctx.fillStyle=o.c||'#9AA0A8'; ctx.fillRect(-Wd/2,-L/2,Wd,L);
+  ctx.fillStyle='rgba(0,0,0,.5)';
+  ctx.fillRect(-Wd/2+5,-L/2+8,Wd-10,long?16:15);
+  ctx.fillRect(-Wd/2+5,L/2-(long?24:21),Wd-10,long?16:15);
+  if(long) ctx.fillRect(-Wd/2+5,-5,Wd-10,10);
+  const tail=(o.brake||o.hazard)?'#FF2D2D':'#7A1D1D';
+  ctx.fillStyle=tail; ctx.fillRect(-Wd/2+3,L/2-4,10,4); ctx.fillRect(Wd/2-13,L/2-4,10,4);
+  if(o.hazard && Math.floor(G.blink*3)%2){ ctx.fillStyle='#FF9E2C'; ctx.fillRect(-Wd/2+3,L/2-4,10,4); ctx.fillRect(Wd/2-13,L/2-4,10,4); }
+  if(o.emerg){ const on=Math.floor(G.blink*6)%2===0;
+    ctx.fillStyle=on?'#3D7BFF':'#1B2A55'; ctx.fillRect(-14,-4,12,7);
+    ctx.fillStyle=on?'#1B2A55':'#3D7BFF'; ctx.fillRect(4,-4,12,7); }
+  if(o.police){ ctx.fillStyle='#E9ECEF'; ctx.fillRect(-Wd/2,-9,Wd,18);
+    const on=Math.floor(G.blink*6)%2===0; ctx.fillStyle=on?'#3D7BFF':'#D8232A'; ctx.fillRect(-13,-5,11,8);
+    ctx.fillStyle=on?'#D8232A':'#3D7BFF'; ctx.fillRect(4,-5,11,8); }
+  ctx.restore();
+}
+function drawCar(x){
+  const Wd=48,L=72;
+  const sc = G.q && G.q.scene;
+  const turning = sc && sc.turn;
+  let px=x, py=CARY, rot=0;
+  if(turning && G.phase==='resolve' && G.lastAnswerRight){
+    const p=G.turnT, s=sc.turn==='right'?1:-1;
+    const upE = smooth(p/0.45);            // roll forward into the junction
+    const swE = smooth((p-0.32)/0.68);     // then swing out onto the cross street
+    py  = CARY - SCENE_GAP*0.85*upE;
+    px  = x + s*96*swE;
+    rot = s*(Math.PI/2)*swE;
+  }
+  if(G.shake) px += (Math.random()-0.5)*G.shake*6;
+
+  ctx.save(); ctx.translate(px,py); ctx.rotate(rot);
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(-Wd/2+2,-L/2+3,Wd,L);
+  const grd=ctx.createLinearGradient(-Wd/2,0,Wd/2,0);
+  grd.addColorStop(0,'#B01B22'); grd.addColorStop(.5,'#F03A41'); grd.addColorStop(1,'#B01B22');
+  ctx.fillStyle=grd; ctx.fillRect(-Wd/2,-L/2,Wd,L);
+  ctx.fillStyle='#141A20'; ctx.fillRect(-Wd/2+6,-L/2+8,Wd-12,18); ctx.fillRect(-Wd/2+6,L/2-24,Wd-12,16);
+  ctx.fillStyle='#2A323C'; ctx.fillRect(-Wd/2+4,-4,Wd-8,10);
+  ctx.fillStyle='#FFF6C8'; ctx.fillRect(-Wd/2+3,-L/2,10,5); ctx.fillRect(Wd/2-13,-L/2,10,5);
+  const braking = G.phase==='ask' || (G.phase==='resolve' && G.q && G.q.stop && G.pedT<1);
+  ctx.fillStyle=braking?'#FF2D2D':'#7A1D1D'; ctx.fillRect(-Wd/2+3,L/2-4,10,4); ctx.fillRect(Wd/2-13,L/2-4,10,4);
+  // turn signal: blink the indicator on the side we are turning toward
+  if(turning && (G.phase==='ask'||G.phase==='resolve') && Math.floor(G.blink*3)%2===0){
+    const s = sc.turn==='right' ? 1 : -1;
+    ctx.fillStyle='#FF9E2C';
+    const ix = s>0 ? Wd/2-6 : -Wd/2;
+    ctx.fillRect(ix,-L/2,6,7); ctx.fillRect(ix,L/2-7,6,7);
+  }
+  ctx.restore();
+}
+function drawBeams(x){
+  const y=CARY, gr=ctx.createLinearGradient(0,y,0,y-300);
+  gr.addColorStop(0,'rgba(255,246,205,.26)'); gr.addColorStop(1,'rgba(255,246,205,0)');
+  ctx.fillStyle=gr; ctx.beginPath();
+  ctx.moveTo(x-16,y-30); ctx.lineTo(x-130,y-300); ctx.lineTo(x+130,y-300); ctx.lineTo(x+16,y-30); ctx.closePath(); ctx.fill();
+}
+function drawPed(x,y,c){
+  ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,5.5,0,7); ctx.fill();
+  ctx.fillRect(x-6,y+4,12,12);
+  ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(x-6,y+15,4,6); ctx.fillRect(x+2,y+15,4,6);
+}
+function drawCyclist(x,y,rot){
+  ctx.save(); ctx.translate(x,y); if(rot) ctx.rotate(rot*Math.PI/180);
+  ctx.strokeStyle='#20242B'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(-8,10,7,0,7); ctx.stroke(); ctx.beginPath(); ctx.arc(8,10,7,0,7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-8,10); ctx.lineTo(0,2); ctx.lineTo(8,10); ctx.stroke();
+  ctx.fillStyle='#E4863F'; ctx.fillRect(-3,-6,6,12);
+  ctx.fillStyle='#F1C27D'; ctx.beginPath(); ctx.arc(0,-9,4,0,7); ctx.fill();
+  ctx.restore();
+}
+function drawDeer(x,y,f){
+  ctx.save(); ctx.translate(x,y); ctx.scale(f||1,1);
+  ctx.fillStyle='#6B4A2C';
+  ctx.fillRect(-14,-6,24,11);
+  ctx.fillRect(8,-18,6,14);
+  ctx.beginPath(); ctx.moveTo(11,-20); ctx.lineTo(22,-22); ctx.lineTo(13,-13); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#6B4A2C'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(13,-19); ctx.lineTo(10,-27); ctx.moveTo(13,-19); ctx.lineTo(17,-26); ctx.stroke();
+  ctx.fillRect(-12,5,3,11); ctx.fillRect(-3,5,3,11); ctx.fillRect(5,5,3,11);
+  ctx.restore();
+}
+
+/* ---- infrastructure ---- */
+function drawTrafficLight(x,y,state){
+  ctx.fillStyle='#14171A'; ctx.fillRect(x,y,26,68);
+  const dim={r:'#4A1416',a:'#4A3A12',g:'#12401F'};
+  ctx.fillStyle=(state==='red'||state==='redamber')?'#FF3B30':dim.r; ctx.beginPath(); ctx.arc(x+13,y+13,8,0,7); ctx.fill();
+  ctx.fillStyle=(state==='amber'||state==='redamber')?'#FFB300':dim.a; ctx.beginPath(); ctx.arc(x+13,y+34,8,0,7); ctx.fill();
+  const gOn=state==='green'||(state==='flashgreen'&&Math.floor(G.blink*4)%2===0);
+  ctx.fillStyle=gOn?'#35C77B':dim.g; ctx.beginPath(); ctx.arc(x+13,y+55,8,0,7); ctx.fill();
+  if(state==='greenarrow'){ ctx.fillStyle='#14171A'; ctx.fillRect(x,y+70,26,26);
+    ctx.fillStyle='#35C77B'; ctx.beginPath();
+    ctx.moveTo(x+6,y+83); ctx.lineTo(x+15,y+83); ctx.lineTo(x+15,y+78); ctx.lineTo(x+22,y+86); ctx.lineTo(x+15,y+94); ctx.lineTo(x+15,y+89); ctx.lineTo(x+6,y+89); ctx.closePath(); ctx.fill(); }
+}
+function drawCrossRoad(g,y){
+  const h=88;
+  ctx.fillStyle=C.asphalt; ctx.fillRect(0,y-h/2,W,h);
+  ctx.fillStyle=C.line; for(let x=-40;x<W+40;x+=64) ctx.fillRect(x,y-2,34,4);
+  ctx.fillStyle=C.line; ctx.fillRect(g.x+6,y+h/2+6,g.w-12,6);        // stop line on our approach
+}
+function drawZebra(g,y){
+  ctx.fillStyle=C.line; const n=7, gw=(g.w-24)/(n*2-1);
+  for(let i=0;i<n;i++) ctx.fillRect(g.x+12+i*gw*2, y-30, gw, 56);
+}
+function drawRail(g,y,barrier,on){
+  ctx.fillStyle='#4A4A44'; ctx.fillRect(g.x-40,y-26,g.w+80,52);
+  ctx.fillStyle='#6A5A44'; for(let x=g.x-36;x<g.right+36;x+=20) ctx.fillRect(x,y-24,10,48);
+  ctx.fillStyle='#9AA0A8'; ctx.fillRect(g.x-40,y-14,g.w+80,4); ctx.fillRect(g.x-40,y+10,g.w+80,4);
+  ctx.fillStyle=C.line; ctx.fillRect(g.x+6,y+30,g.w-12,5);
+  [g.x-24,g.right+24].forEach(px=>{
+    ctx.fillStyle='#14171A'; ctx.fillRect(px-3,y-4,6,42);
+    const lit=on&&Math.floor(G.blink*3)%2===0; ctx.fillStyle=lit?'#FF3B30':'#4A1416';
+    ctx.beginPath(); ctx.arc(px,y-10,7,0,7); ctx.fill();
+    ctx.strokeStyle=C.line; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(px-9,y-34); ctx.lineTo(px+9,y-20); ctx.moveTo(px+9,y-34); ctx.lineTo(px-9,y-20); ctx.stroke();
+  });
+  if(barrier){ ctx.fillStyle=C.line; ctx.fillRect(g.x+6,y+22,g.w*0.55,7);
+    ctx.fillStyle='#D8232A'; for(let i=0;i<5;i++) ctx.fillRect(g.x+6+i*(g.w*0.55/5),y+22,g.w*0.55/10,7); }
+}
+
+/* ---- signs (Polish pictograms, no invented text) ---- */
+function drawSign(x,y,kind,val){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='#5A616B'; ctx.fillRect(-2,24,4,46);
+  const warnTri=()=>{ ctx.fillStyle='#D8232A'; ctx.beginPath(); ctx.moveTo(0,-25); ctx.lineTo(26,20); ctx.lineTo(-26,20); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#F5C518'; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(19,15); ctx.lineTo(-19,15); ctx.closePath(); ctx.fill(); };
+  const blueSq=()=>{ ctx.fillStyle='#1B4FA0'; ctx.beginPath();
+    if(ctx.roundRect){ ctx.roundRect(-24,-24,48,48,5);} else { ctx.rect(-24,-24,48,48);} ctx.fill(); };
+  switch(kind){
+    case 'stop':
+      ctx.fillStyle='#D8232A'; ctx.beginPath(); for(let i=0;i<8;i++){const a=Math.PI/8+i*Math.PI/4; ctx.lineTo(Math.cos(a)*24,Math.sin(a)*24);} ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='700 12px Bahnschrift,Arial Narrow,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('STOP',0,1);
+      break;
+    case 'yield':
+      ctx.fillStyle='#D8232A'; ctx.beginPath(); ctx.moveTo(0,24); ctx.lineTo(-26,-20); ctx.lineTo(26,-20); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(0,15); ctx.lineTo(-17,-14); ctx.lineTo(17,-14); ctx.closePath(); ctx.fill();
+      break;
+    case 'priority':
+      ctx.fillStyle='#14171A'; ctx.beginPath(); ctx.moveTo(0,-26); ctx.lineTo(26,0); ctx.lineTo(0,26); ctx.lineTo(-26,0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#F5C518'; ctx.beginPath(); ctx.moveTo(0,-17); ctx.lineTo(17,0); ctx.lineTo(0,17); ctx.lineTo(-17,0); ctx.closePath(); ctx.fill();
+      break;
+    case 'noentry':
+      ctx.fillStyle='#D8232A'; ctx.beginPath(); ctx.arc(0,0,23,0,7); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.fillRect(-14,-4,28,8);
+      break;
+    case 'mandatory':
+      ctx.fillStyle='#1B4FA0'; ctx.beginPath(); ctx.arc(0,0,23,0,7); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(0,11); ctx.lineTo(0,-4); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.moveTo(0,-13); ctx.lineTo(-8,-2); ctx.lineTo(8,-2); ctx.closePath(); ctx.fill();
+      break;
+    case 'speed':
+      ctx.fillStyle='#D8232A'; ctx.beginPath(); ctx.arc(0,0,23,0,7); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,16,0,7); ctx.fill();
+      ctx.fillStyle='#14171A'; ctx.font='700 16px Bahnschrift,Arial Narrow,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(val||'50',0,1);
+      break;
+    case 'children':
+      warnTri(); ctx.fillStyle='#14171A';
+      ctx.beginPath(); ctx.arc(-5,-3,3,0,7); ctx.fill(); ctx.fillRect(-7,0,4,8);
+      ctx.beginPath(); ctx.arc(6,-1,3,0,7); ctx.fill(); ctx.fillRect(4,2,4,8);
+      break;
+    case 'animal':
+      warnTri(); ctx.fillStyle='#14171A';
+      ctx.fillRect(-8,0,14,5); ctx.fillRect(4,-6,4,7);
+      ctx.beginPath(); ctx.moveTo(7,-8); ctx.lineTo(14,-10); ctx.lineTo(8,-3); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#14171A'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(9,-8); ctx.lineTo(7,-13); ctx.moveTo(9,-8); ctx.lineTo(12,-12); ctx.stroke();
+      ctx.fillRect(-7,5,2,6); ctx.fillRect(3,5,2,6);
+      break;
+    case 'bike':
+      warnTri(); ctx.strokeStyle='#14171A'; ctx.lineWidth=1.8;
+      ctx.beginPath(); ctx.arc(-6,7,5,0,7); ctx.stroke(); ctx.beginPath(); ctx.arc(6,7,5,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-6,7); ctx.lineTo(0,-1); ctx.lineTo(6,7); ctx.moveTo(0,-1); ctx.lineTo(4,-2); ctx.stroke();
+      break;
+    case 'pedX':
+      blueSq(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-2,-10,4,0,7); ctx.fill();
+      ctx.fillRect(-5,-6,6,11); ctx.fillRect(-10,10,20,3);
+      for(let i=0;i<3;i++) ctx.fillRect(-9+i*7,6,4,8);
+      break;
+    case 'busstop':
+      blueSq(); ctx.fillStyle='#fff'; ctx.fillRect(-13,-13,26,21);
+      ctx.fillStyle='#1B4FA0'; ctx.fillRect(-10,-10,8,7); ctx.fillRect(1,-10,8,7);
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-7,11,2,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(7,11,2,0,7); ctx.fill();
+      break;
+    case 'builtup':
+      ctx.fillStyle='#E4E7EA'; ctx.fillRect(-26,-16,52,34);
+      ctx.fillStyle='#3A3F47'; ctx.fillRect(-18,-2,8,18); ctx.fillRect(-8,-8,10,24); ctx.fillRect(4,-4,8,20); ctx.fillRect(14,2,6,14);
+      break;
+    case 'residential':
+      blueSq(); ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.moveTo(-15,-3); ctx.lineTo(-7,-11); ctx.lineTo(1,-3); ctx.closePath(); ctx.fill(); ctx.fillRect(-13,-3,12,8);
+      ctx.fillRect(2,5,15,6); ctx.beginPath(); ctx.arc(12,-6,3,0,7); ctx.fill(); ctx.fillRect(10,-3,4,6);
+      break;
+    default:
+      warnTri(); ctx.fillStyle='#14171A'; ctx.font='700 20px Bahnschrift,Arial Narrow,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('!',0,4);
+  }
+  ctx.restore();
+}
+
+/* ---- scene compositor ---- */
+function drawSceneObjects(sc,g,road){
+  const y=sceneY(), k=sc.k;
+  ctx.save();
+  switch(k){
+    case 'lights':
+      drawCrossRoad(g,y); drawTrafficLight(g.right+22,y-96,sc.light); break;
+    case 'inter': {
+      drawCrossRoad(g,y); const t=approachT();
+      if(sc.from==='right') drawVehicle(g.right+80-t*70,y,{c:'#E4863F',rot:-90});
+      else drawVehicle(g.x-80+t*70,y,{c:'#E4863F',rot:90});
+      break; }
+    case 'leftturn':
+      drawCrossRoad(g,y); drawVehicle(g.off,y-58,{c:'#E4863F',rot:180}); break;
+    case 'roundabout': {
+      const R=60;
+      // four arms: horizontal band (no stop line) + our vertical road = 4-way junction
+      ctx.fillStyle=C.asphalt; ctx.fillRect(0, y-24, W, 48);
+      // circulating carriageway (asphalt disc) so the arms blend into the ring
+      ctx.fillStyle=C.asphalt; ctx.beginPath(); ctx.arc(g.cx,y,R+6,0,7); ctx.fill();
+      // outer edge line of the ring
+      ctx.strokeStyle=C.line; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(g.cx,y,R,0,7); ctx.stroke();
+      // central island + kerb
+      ctx.fillStyle=(road==='city')?'#43663A':'#5A4B33'; ctx.beginPath(); ctx.arc(g.cx,y,R-26,0,7); ctx.fill();
+      ctx.strokeStyle='#DDE1E4'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(g.cx,y,R-26,0,7); ctx.stroke();
+      // give-way "shark teeth" across our approach lane, just before the ring
+      ctx.fillStyle=C.line;
+      for(let i=0;i<6;i++){ const bx=g.our-34+i*12; ctx.beginPath(); ctx.moveTo(bx,y+R+6); ctx.lineTo(bx+8,y+R+6); ctx.lineTo(bx+4,y+R+13); ctx.closePath(); ctx.fill(); }
+      // give-way sign at the entry
+      drawSign(g.right+16, y+R-4, 'yield');
+      // one car circulating on the ring — tangent, counter-clockwise (Polish roundabout)
+      const th = -(G.blink*0.8);
+      const rr=R-14, cxp=g.cx+Math.cos(th)*rr, cyp=y+Math.sin(th)*rr;
+      ctx.save(); ctx.translate(cxp,cyp); ctx.rotate(th);
+      ctx.fillStyle='rgba(0,0,0,.30)'; ctx.fillRect(-10,-19,22,38);
+      ctx.fillStyle='#5AA9E6'; ctx.fillRect(-11,-20,24,40);
+      ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(-8,-14,16,10); ctx.fillRect(-8,5,16,10);
+      ctx.restore();
+      break; }
+    case 'tram': case 'tramstop': {
+      ctx.fillStyle='#3A3F47'; ctx.fillRect(g.cx-30,0,60,H);
+      ctx.fillStyle='#9AA0A8'; ctx.fillRect(g.cx-22,0,4,H); ctx.fillRect(g.cx+18,0,4,H);
+      const ty=k==='tram'?(y-150+(G.odo*0.2)%40):y-30;
+      ctx.fillStyle='#C23B2E'; ctx.fillRect(g.cx-24,ty,48,150);
+      ctx.fillStyle='#F5C518'; ctx.fillRect(g.cx-24,ty,48,6);
+      ctx.fillStyle='#141A20'; ctx.fillRect(g.cx-18,ty+14,36,26); ctx.fillRect(g.cx-18,ty+70,36,26); ctx.fillRect(g.cx-18,ty+118,36,20);
+      if(k==='tramstop'){ drawPed(g.cx+40,ty+82,'#F5C518'); drawPed(g.cx+58,ty+108,'#9FD5F0'); }
+      break; }
+    case 'rail': drawRail(g,y,!!sc.barrier,true); break;
+    case 'crossing':
+      drawZebra(g,y); drawSign(g.right+20,y-58,'pedX');
+      { let walk = (G.phase==='resolve'&&G.lastAnswerRight) ? Math.min(1,0.12+G.pedT*0.6) : (sc.waiting?0.0:0.18);
+        drawPed(g.x-14+walk*(g.w+28), y-2, '#F5C518'); }
+      if(sc.carAhead) drawVehicle(g.our,y+80,{c:'#5AA9E6',brake:true});
+      break;
+    case 'cyclist':
+      if(sc.lane){
+        ctx.fillStyle='#7A3326'; ctx.fillRect(g.x+6,y-22,g.w-12,44);
+        ctx.fillStyle=C.line; for(let x=g.x+10;x<g.right-10;x+=24){ ctx.fillRect(x,y-20,12,7); ctx.fillRect(x,y+13,12,7); }
+        drawCyclist(g.x+g.w*0.4,y,0); drawSign(g.right+20,y-52,'bike');
+      } else { drawCyclist(g.off+16,y,-90); }
+      break;
+    case 'animal':
+      drawSign(g.right+20,y-52,'animal');
+      { const t=approachT(); drawDeer(g.x-8+(sc.onRoad?t*g.w*0.5:6), y-2, 1); }
+      break;
+    case 'bus': {
+      drawSign(g.right+22,y-40,'busstop'); const ty=y-40;
+      drawVehicle(g.our+6,ty,{c:'#F5C518',long:true});
+      if(Math.floor(G.blink*4)%2===0){ ctx.fillStyle='#FF9E2C'; ctx.beginPath(); ctx.arc(g.our-19,ty+64,5,0,7); ctx.fill(); }
+      break; }
+    case 'children':
+      drawSign(g.right+20,y-40,'children');
+      drawPed(g.right+14,y+16,'#35C77B'); drawPed(g.right+34,y+40,'#5AA9E6'); break;
+    case 'emergency': { const ey=CARY+150-(sc.near?50:0); drawVehicle(g.our,ey,{c:'#D8232A',long:true,emerg:true}); break; }
+    case 'jam': {
+      const cols=['#5AA9E6','#E4863F','#9AA0A8','#35C77B','#B8452E'];
+      for(let i=0;i<5;i++){ drawVehicle(g.our,y-40-i*95,{c:cols[i%5]}); drawVehicle(g.off,y-88-i*95,{c:cols[(i+2)%5]}); }
+      if(sc.corridor) drawVehicle(g.cx,y-150,{c:'#D8232A',long:true,emerg:true});
+      break; }
+    case 'merge':
+      ctx.fillStyle='#F5C518'; for(let i=0;i<7;i++){ const yy=y-150+i*26; ctx.fillRect(g.right-16-i*4,yy,12,16); }
+      drawVehicle(g.off,y-50,{c:'#5AA9E6'}); break;
+    case 'follow':
+      drawVehicle(g.our,y-10,{c:'#9AA0A8'});
+      if(sc.tow){ drawVehicle(g.our,y-110,{c:'#E4863F'});
+        ctx.strokeStyle='#F5C518'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(g.our,y-52); ctx.lineTo(g.our,y-72); ctx.stroke(); }
+      if(sc.tunnel){ ctx.fillStyle='rgba(8,10,14,.5)'; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle='#FFB74D'; for(let i=0;i<7;i++){ ctx.fillRect(g.x-8,((i*130+G.odo)%H),5,18); ctx.fillRect(g.right+3,((i*130+65+G.odo)%H),5,18); } }
+      break;
+    case 'overtake':
+      drawVehicle(g.our,y-20,{c:'#9AA0A8'});
+      if(sc.hard){ ctx.fillStyle=C.line; ctx.fillRect(g.right-9,0,3,H); } break;
+    case 'breakdown': {
+      drawVehicle(g.our,y-20,{c:'#B8452E',hazard:true});
+      const tx=g.our, ty=y+70;
+      ctx.fillStyle='#D8232A'; ctx.beginPath(); ctx.moveTo(tx,ty-12); ctx.lineTo(tx-12,ty+8); ctx.lineTo(tx+12,ty+8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=C.asphalt; ctx.beginPath(); ctx.moveTo(tx,ty-3); ctx.lineTo(tx-6,ty+5); ctx.lineTo(tx+6,ty+5); ctx.closePath(); ctx.fill();
+      break; }
+    case 'skid':
+      ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=7;
+      ctx.beginPath(); ctx.moveTo(g.our-12,y+120); ctx.bezierCurveTo(g.our-40,y+70,g.our+26,y+40,g.our-4,y); ctx.stroke();
+      if(sc.aqua){ ctx.fillStyle='rgba(120,175,215,.32)'; ctx.fillRect(g.x+8,y-50,g.w-16,110); } break;
+    case 'police': drawVehicle(g.right+48,y+8,{c:'#1B2A55',police:true}); break;
+    case 'sign': drawSign(g.right+20,y-30,sc.sign,sc.val); break;
+    case 'plain': if(sc.sign) drawSign(g.right+20,y-30,sc.sign,sc.val); break;
+    default: break;
+  }
+  ctx.restore();
+}
+
+/* ---------------------------- LOOP ---------------------------- */
+let last=0;
+function loop(t){
+  const dt = Math.min(40, t-last)||16; last=t;
+  G.blink += dt/1000;
+  if(G.flash>0) G.flash -= dt/450;
+  if(G.shake>0) G.shake -= dt/300;
+
+  if(G.phase==='drive'){
+    const askPoint = G.hazPos - SCENE_GAP;
+    const remain = askPoint - G.odo;
+    const target = remain < 200 ? Math.max(0.7, G.cruise*(remain/200)) : G.cruise;
+    G.speed += (target - G.speed)*0.06;
+    G.odo += G.speed*(dt/16);
+    if(remain <= 2){ G.odo = askPoint; G.speed=0; ask(); }
+  }
+  else if(G.phase==='ask'){
+    G.speed=0;                         // car is stopped at the line
+    if(G.mode==='exam' && !G.answered){
+      G.qTime -= dt/1000;
+      const frac = Math.max(0, G.qTime/G.qLimit);
+      tbar.style.width = (frac*100)+'%';
+      tbar.className = frac<0.2 ? 'crit' : frac<0.45 ? 'warn' : '';
+      if(G.qTime<=5 && Math.floor(G.qTime*2)!==G._tick){ G._tick=Math.floor(G.qTime*2); if(G.qTime>0) sTick(); }
+      if(G.qTime<=0) answer(-1);
+      const left = Math.max(0, Math.floor((G.examEnd - Date.now())/1000));
+      hudTimer.textContent = String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');
+      hudTimer.className = left<120 ? 'chip alarm' : 'chip';
+      if(left<=0) finish();
+    }
+  }
+  else if(G.phase==='resolve'){
+    G.pedT += dt/900;
+    const isTurn = G.q && G.q.scene && G.q.scene.turn && G.lastAnswerRight;
+    if(G.pedT > (G.q && G.q.stop ? 1.15 : 0.35)){
+      if(isTurn){                       // crawl through the corner while the car turns
+        G.turnT = Math.min(1, G.turnT + dt/850);
+        G.odo += 0.7*(dt/16);
+      } else {
+        G.speed += (G.cruise - G.speed)*0.05;
+        G.odo += G.speed*(dt/16);
+      }
+    }
+  }
+
+  if(G.phase!=='idle') drawWorld();
+  requestAnimationFrame(loop);
+}
+
+/* ---------------------------- FLOW ---------------------------- */
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0; [a[i],a[j]]=[a[j],a[i]];} return a; }
+function pick(list,n){ return shuffle(list).slice(0,n); }
+
+function buildExam(){
+  const yn = BANK.filter(q=>q.type==='yn'), abc = BANK.filter(q=>q.type==='abc');
+  const take=(pool,pts,n)=>{
+    let s = pick(pool.filter(q=>q.pts===pts), n);
+    if(s.length<n){ // top up from the rest if a tier is short
+      const extra = pick(pool.filter(q=>!s.includes(q)), n-s.length).map(q=>Object.assign({},q,{pts}));
+      s = s.concat(extra);
+    }
+    return s;
+  };
+  const basic = shuffle([...take(yn,3,10), ...take(yn,2,6), ...take(yn,1,4)]);
+  const spec  = shuffle([...take(abc,3,6), ...take(abc,2,4), ...take(abc,1,2)]);
+  return basic.concat(spec);           // basic block first, exactly like WORD
+}
+
+function startMode(mode, level){
+  G.mode=mode; G.level=level||null;
+  G.idx=0; G.points=0; G.correct=0; G.wrong=0; G.streak=0; G.missed=[]; G.odo=0; G.speed=0; G.hazPos=SPAWN_AHEAD; G.spawnOdo=0; G.turnT=0;
+  if(mode==='learn'){
+    G.queue = shuffle(BANK.filter(q=>q.lv===level));
+    G.maxPoints = G.queue.length;
+  } else if(mode==='practice'){
+    G.queue = shuffle(BANK);
+    G.maxPoints = G.queue.length;
+  } else {
+    G.queue = buildExam();
+    G.maxPoints = G.queue.reduce((s,q)=>s+q.pts,0);   // 74
+    G.examEnd = Date.now() + 25*60*1000;
+    hudTimer.style.display='block';
+  }
+  screens('none');
+  hudTimer.style.display = mode==='exam' ? 'block' : 'none';
+  tbarWrap.className = mode==='exam' ? 'show' : '';
+  nextQuestion();
+}
+
+function nextQuestion(){
+  if(G.idx >= G.queue.length) return finish();
+  G.q = G.queue[G.idx];
+  G.answered=false; G.pedT=0; G.turnT=0;
+  G.odo = 0; G.spawnOdo = 0; G.hazPos = SPAWN_AHEAD; G.speed = 0;
+  G.phase='drive';
+  dock.classList.remove('up');
+  updateHud();
+}
+
+function ask(){
+  G.phase='ask';
+  const q=G.q;
+  metaEl.innerHTML='';
+  const tag=(t,c)=>{const s=document.createElement('span'); s.className='tag '+(c||''); s.textContent=t; metaEl.appendChild(s);};
+  if(G.mode==='exam'){
+    tag('Question '+(G.idx+1)+' / 32');
+    tag(q.type==='yn'?'Basic · Yes/No':'Specialist · A-B-C','kind');
+    tag(q.pts+' pt'+(q.pts>1?'s':''),'pts');
+  } else if(G.mode==='learn'){
+    tag('Level '+q.lv+' · '+LEVELS[q.lv-1].name);
+    tag((G.idx+1)+' / '+G.queue.length);
+  } else {
+    tag('Question '+(G.correct+G.wrong+1));
+    tag('Streak '+G.streak,'pts');
+  }
+  qtext.textContent = q.q;
+
+  answersEl.innerHTML=''; answersEl.className = q.type==='yn' ? 'yn' : '';
+  let opts, keys;
+  if(q.type==='yn'){
+    opts=['Yes','No']; keys=['Y','N']; G.correctIdx = q.a===true?0:1;
+  } else {
+    // shuffle the A/B/C options each time so the answer is never in a fixed spot
+    const pairs = q.opts.map((t,idx)=>({t,correct:idx===q.a}));
+    for(let i=pairs.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[pairs[i],pairs[j]]=[pairs[j],pairs[i]];}
+    opts = pairs.map(p=>p.t); keys=['A','B','C'];
+    G.correctIdx = pairs.findIndex(p=>p.correct);
+  }
+  opts.forEach((o,i)=>{
+    const b=document.createElement('button'); b.className='ans'; b.dataset.i=i;
+    b.innerHTML = '<span class="key">'+keys[i]+'</span><span>'+o+'</span>';
+    b.onclick=()=>answer(i);
+    answersEl.appendChild(b);
+  });
+
+  fb.classList.remove('show');
+  if(G.mode==='exam'){
+    G.qLimit = useWordTimer ? (q.type==='yn'?35:50) : 30;
+    G.qTime = G.qLimit; G._tick=null;
+    tbar.style.width='100%'; tbar.className='';
+  }
+  dock.classList.add('up');
+  setTimeout(()=>{const f=answersEl.querySelector('.ans'); if(f) f.focus();},380);
+}
+
+function answer(i){
+  if(G.answered) return;
+  G.answered=true;
+  const q=G.q;
+  const correctIdx = G.correctIdx;
+  const right = i===correctIdx;
+  G.lastAnswerRight = right;
+
+  [...answersEl.children].forEach((b,bi)=>{
+    b.disabled=true;
+    if(bi===correctIdx) b.classList.add('right');
+    else if(bi===i) b.classList.add('wrong');
+  });
+
+  if(right){
+    G.correct++; G.streak++; G.best=Math.max(G.best,G.streak);
+    G.points += (G.mode==='exam' ? q.pts : 1);
+    verdict.textContent='Correct'; verdict.className='ok';
+    G.flash=0.5; G.flashCol='#35C77B'; sGood();
+  } else {
+    G.wrong++; G.streak=0;
+    verdict.textContent = i===-1 ? 'Time is up — 0 points' : 'Wrong';
+    verdict.className='no';
+    G.flash=0.9; G.flashCol='#D8232A'; G.shake=1; sBad();
+    G.missed.push(q);
+  }
+  whyEl.textContent = q.why;
+
+  if(G.mode==='exam'){
+    // WORD rules: no explanations during the exam, no going back
+    whyEl.textContent = '';
+    verdict.textContent = 'Answer recorded';
+    verdict.className = '';
+    fb.classList.add('show');
+    setTimeout(()=>{ if(G.phase!=='idle' && G.answered) proceed(); }, 900);
+  } else {
+    fb.classList.add('show');
+    nextBtn.focus();
+  }
+  G.phase='resolve'; G.pedT=0;
+  updateHud();
+}
+
+function proceed(){
+  dock.classList.remove('up');
+  G.idx++;
+  if(G.idx>=G.queue.length){
+    if(G.mode==='practice'){            // endless: reshuffle the pool and keep going
+      const last=G.queue[G.queue.length-1];
+      let nq=shuffle(BANK);
+      if(nq[0]===last && nq.length>1){[nq[0],nq[1]]=[nq[1],nq[0]];}
+      G.queue=nq; G.idx=0;
+    } else return finish();
+  }
+  G.q=G.queue[G.idx]; G.answered=false; G.pedT=0; G.turnT=0;
+  G.spawnOdo = G.odo;
+  G.hazPos   = G.odo + SPAWN_AHEAD;      // next hazard appears ahead; odometer is NOT reset
+  if(G.speed < G.cruise*0.5) G.speed = G.cruise*0.5;   // keep the road flowing
+  G.phase='drive';
+  updateHud();
+}
+nextBtn.onclick = proceed;
+
+function updateHud(){
+  if(G.mode==='exam'){
+    hudLeft.innerHTML = 'WORD Exam · <b>'+(G.idx+1)+'/32</b>';
+    hudScore.innerHTML = 'Points <b>'+G.points+'</b>/74';
+  } else if(G.mode==='learn'){
+    hudLeft.innerHTML = 'Learn · Level '+G.level+' — '+LEVELS[G.level-1].name;
+    hudScore.innerHTML = 'Correct <b>'+G.correct+'</b>/'+G.queue.length;
+  } else {
+    hudLeft.innerHTML = 'Practice · Streak <b>'+G.streak+'</b>';
+    hudScore.innerHTML = 'Correct <b>'+G.correct+'</b> · Wrong '+G.wrong;
+  }
+}
+
+function finish(){
+  G.phase='idle';
+  dock.classList.remove('up');
+  hudTimer.style.display='none';
+  const pass = G.mode==='exam' ? G.points>=68 : (G.correct/Math.max(1,G.correct+G.wrong))>=0.9;
+  el('endKicker').textContent = G.mode==='exam' ? 'WORD theory exam · result' :
+                                G.mode==='learn' ? 'Level '+G.level+' · debrief' : 'Practice run · debrief';
+  el('endScore').innerHTML = G.mode==='exam'
+      ? G.points+'<small>/74 pts</small>'
+      : G.correct+'<small>/'+(G.correct+G.wrong)+'</small>';
+  el('endStamp').innerHTML = G.mode==='exam'
+      ? '<div class="stamp '+(pass?'pass':'fail')+'">'+(pass?'Passed':'Failed')+'</div>'
+      : (pass?'<div class="stamp pass">Sharp</div>':'<div class="stamp fail">Keep drilling</div>');
+  el('endStats').innerHTML =
+      '<span>Correct <b>'+G.correct+'</b></span><span>Wrong <b>'+G.wrong+'</b></span>'+
+      (G.mode==='exam' ? '<span>Pass mark <b>68</b>/74</span>' : '<span>Best streak <b>'+G.best+'</b></span>');
+
+  const m = el('endMissed');
+  if(G.missed.length){
+    m.innerHTML = '<h4>What went wrong ('+G.missed.length+')</h4>' + G.missed.map(q=>
+      '<div class="mrow"><p>'+q.q+'</p><p class="fix">'+q.why+'</p></div>').join('');
+  } else m.innerHTML = '<h4>Clean run — nothing missed</h4>';
+
+  if(G.mode==='learn' && G.wrong===0) learnDone.add(G.level);
+  if(G.mode==='exam') beep(pass?900:180,.4,pass?'sine':'sawtooth');
+  screens('scEnd');
+}
+
+/* ---------------------------- SCREENS ---------------------------- */
+function screens(id){
+  ['scMenu','scModes','scLevels','scEnd'].forEach(s=>el(s).classList.toggle('on', s===id));
+  if(id!=='none' && id) G.phase='idle';
+}
+el('btnStart').onclick = ()=>screens('scModes');
+el('backMenu').onclick = ()=>screens('scMenu');
+el('backModes').onclick = ()=>screens('scModes');
+el('mPractice').onclick = ()=>startMode('practice');
+el('mExam').onclick = ()=>startMode('exam');
+el('mLearn').onclick = ()=>{ renderLevels(); screens('scLevels'); };
+el('quitBtn').onclick = ()=>{ G.phase='idle'; dock.classList.remove('up'); screens('scMenu'); };
+el('endMenu').onclick = ()=>screens('scMenu');
+el('endAgain').onclick = ()=>{
+  if(G.mode==='learn') startMode('learn', G.level);
+  else startMode(G.mode);
+};
+el('tgTimer').onclick = e => {
+  useWordTimer = !useWordTimer;
+  e.target.textContent = 'Timer: ' + (useWordTimer?'WORD official':'Flat 30 s');
+  e.target.classList.toggle('on', useWordTimer);
+};
+el('tgSound').onclick = e => {
+  soundOn = !soundOn;
+  e.target.textContent = 'Sound: ' + (soundOn?'on':'off');
+  e.target.classList.toggle('on', soundOn);
+};
+function renderLevels(){
+  const list = el('lvList'); list.innerHTML='';
+  LEVELS.forEach(L=>{
+    const n = BANK.filter(q=>q.lv===L.n).length;
+    const b=document.createElement('button');
+    b.className='lv'+(learnDone.has(L.n)?' done':'');
+    b.innerHTML='<b>'+L.n+'. '+L.name+'</b><small>'+L.d+' · '+n+' questions</small>';
+    b.onclick=()=>startMode('learn', L.n);
+    list.appendChild(b);
+  });
+}
+
+/* ---------------------------- KEYS ---------------------------- */
+document.addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  if(k==='escape'){ G.phase='idle'; dock.classList.remove('up'); screens('scMenu'); return; }
+  if(G.phase==='idle') return;
+  if(!G.answered && G.phase==='ask'){
+    if(G.q.type==='yn'){ if(k==='y') answer(0); if(k==='n') answer(1); }
+    else { if(k==='a') answer(0); if(k==='b') answer(1); if(k==='c') answer(2); }
+  } else if(G.answered && (k==='enter'||k===' ')){
+    if(G.mode!=='exam'){ e.preventDefault(); proceed(); }
+  }
+});
+
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
